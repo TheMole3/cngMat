@@ -14,8 +14,8 @@
     "jsdom": "^19.0.0",
     "mongojs": "^3.1.0",
     "node-schedule": "^2.1.0",
+    "ocr-space-api-wrapper": "^2.1.0",
     "request": "^2.88.2",
-    "sharp": "^0.29.3",
-    "tesseract.js": "^2.1.5"
+    "sharp": "^0.29.3"
   }
 }
