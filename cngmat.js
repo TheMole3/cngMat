@@ -87,7 +87,8 @@ module.exports = function(app, db, config) {
                 today = false;
             }
             cngMat.getFromDate(currDate, (food) => {
-                cb(food, today)
+				food.today = today
+                cb(food)
             })
         },
 
