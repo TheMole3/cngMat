@@ -128,7 +128,7 @@ module.exports = function(app, db, config) {
         }
     }
 
-    //cngMat.loadFoodFromSource() // Update database
+    cngMat.loadFoodFromSource() // Update database
     var updateDB = schedule.scheduleJob('00 12 * * *', () => { // Update DB at 12:00 every day
         cngMat.loadFoodFromSource()
         console.log("Updated cngMat DB at " + new Date())
