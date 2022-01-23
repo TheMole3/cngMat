@@ -1,0 +1,6 @@
+  {
+    "port": port,
+    "dbConnect": "DB Connect string",
+    "auth": false,
+    "OCRSpaceKey": "OCR Space Key"
+  }

@@ -72,13 +72,13 @@
             Getters
         */
         let getWeeks = async () => {
-            let response = await fetch(`/getAvailableWeeks`);
+            let response = await fetch(`getAvailableWeeks`);
             let week = await response.json();
             return week;
         }
         let loadWeek = async (date) => { // Load a defined week into view date={year:2022, week:4}
             $('#inspector').empty()
-            let response = await fetch(`/getWeek?week=${date.week}&year=${date.year}`);
+            let response = await fetch(`getWeek?week=${date.week}&year=${date.year}`);
             let week = await response.json(); week = week[0];
             ;["mon", "tue", "wed", "thu", "fri"].forEach((dayName) => {
                 let day = week[dayName];
@@ -113,7 +113,7 @@
             })
         })
         $("#delete").on('click', async () => {
-            await fetch('/admin/delete', {
+            await fetch('admin/delete', {
                 method: 'POST',
                 headers: {
                 'Accept': 'application/json',
@@ -144,7 +144,7 @@
             });
             console.log(weekObject)
 
-            fetch('/admin/set', {
+            fetch('admin/set', {
                 method: 'POST',
                 headers: {
                 'Accept': 'application/json',
