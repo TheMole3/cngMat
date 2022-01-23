@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>CngMat Admin</title>
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2b5797">
+    <meta name="msapplication-TileColor" content="#2b5797">
+    <meta name="theme-color" content="#3333333">
+
+    <meta name="description" content="CngMat Admin page" />
+
+    <style>
+        ul {
+            list-style: none;
+        }
+        .day {
+            padding-bottom: 30px;
+        }
+        input {
+            width: 60%;
+            color: black;
+        }
+        .title {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <label for="year">År</label>
+    <select class="dateSelection" id="year" name="year"></select>
+    <label for="week">Vecka</label>
+    <select class="dateSelection" id="week" name="week"></select>
+    <button id="delete">Ta bort vecka</button>
+    &emsp;&emsp;&emsp;&emsp;&emsp;
+    <button id="updateData">Update with new data</button>
+    <button id="updateDB">Update DB from source</button>
+
+    <ul id="inspector">
+
+    </ul>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        /*
+            Global vars
+        */
+        let availableWeeks;
+
+        /*
+            DOM manipulation
+        */
+        let changeDateSelection = (year) => {
+            $("#year").empty()
+            $("#week").empty()
+            Object.keys(availableWeeks).forEach((year, i) => {
+                $("#year").append(`<option value="${year}">${year}</option>`)
+            });
+            $("#year").val(year);
+            availableWeeks[year].sort((a,b) => b-a).forEach((week, i) => {
+                $("#week").append(`<option value="${week}">${week}</option>`)
+            })
+        }
+
+        /*
+            Getters
+        */
+        let getWeeks = async () => {
+            let response = await fetch(`/getAvailableWeeks`);
+            let week = await response.json();
+            return week;
+        }
+        let loadWeek = async (date) => { // Load a defined week into view date={year:2022, week:4}
+            $('#inspector').empty()
+            let response = await fetch(`/getWeek?week=${date.week}&year=${date.year}`);
+            let week = await response.json(); week = week[0];
+            ;["mon", "tue", "wed", "thu", "fri"].forEach((dayName) => {
+                let day = week[dayName];
+                let dayElem = $(`<div class="day" id="${dayName}">
+                    <p class="title">${dayName}</p>
+                    </div>`)
+                
+                let foodElem = $(`<div class="foodElem" id="${dayName}"\>`)
+                day.food.forEach((food,i) => {
+                    foodElem.append(`
+                        <input class="foodInput" id="${dayName+i}" value="${food}"><button class="removeButton" id="${dayName+i}">Remove</button>`)
+                });
+                dayElem.append(foodElem)
+                dayElem.append(`<button class="addButton" id="${dayName}">Add</button>`)
+
+                dayElem.append(`<br><br><lable for="veg${dayName}">Veg</lable><br><input id="veg${dayName}" class="vegInput" id="${dayName}" value="${day.veg}">`)
+                
+                $('#inspector').append(dayElem)
+            });
+        }
+
+        /*
+            Listeners
+        */
+        $("#year").on("change", () => {
+            changeDateSelection($("#year").val())
+        })
+        $(".dateSelection").on("change", () => {
+            loadWeek({
+                year: $("#year").val(),
+                week: $("#week").val()
+            })
+        })
+        $("#delete").on('click', async () => {
+            await fetch('/admin/delete', {
+                method: 'POST',
+                headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    year: $("#year").val(),
+                    week: $("#week").val()
+                })
+            });
+            window.location.reload()
+        })
+
+        $("#updateData").on('click', () => {
+            let weekObject = {
+                year: $("#year").val(),
+                week: $("#week").val(),
+            }
+            $('#inspector .day').each((i, e) => {
+                let dayName = $(e)[0].id;
+                weekObject[dayName] = {
+                    food: [],
+                    veg: $(e).children(".vegInput")[0].value
+                }
+                $(e).children(".foodElem").children('.foodInput').each((i, e) => {
+                    weekObject[dayName].food.push($(e)[0].value)
+                })
+            });
+            console.log(weekObject)
+
+            fetch('/admin/set', {
+                method: 'POST',
+                headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(weekObject)
+            });
+        })
+        $("#updateDB").on('click', async () => {
+            $('body').css('cursor', "progress")
+            await fetch('/admin/update')
+            window.location.reload()
+        })
+
+        $('body').on('click', '.removeButton', (e) => {
+            let name = $(e.currentTarget)[0].id;
+            $(`.foodInput#${name}`).remove()
+            $(e.currentTarget)[0].remove()
+        })
+
+        $('body').on('click', '.addButton', (e) => {
+            let name = $(e.currentTarget)[0].id;
+            let num = parseInt($(`.foodElem#${name.replace(/\d/, "")} .foodInput`).last()[0].id.replace(/[a-zA-Z]/g, "")) + 1
+            $(`.foodElem#${name}`).append(`<input class="foodInput" id="${name + num}" value=><button class="removeButton" id="${name + num}">Remove</button>`)
+        })
+
+        /*
+            Initialisation
+        */
+        let init = async () => {
+            availableWeeks = await getWeeks();
+            changeDateSelection(Object.keys(availableWeeks).sort((a,b) => a-b)[Object.keys(availableWeeks).length-1])
+            loadWeek({
+                year: $("#year").val(),
+                week: $("#week").val()
+            })
+        }
+        init()
+
+        
+    </script>
+</body>
