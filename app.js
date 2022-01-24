@@ -26,6 +26,9 @@ if(config.auth) app.use(require("/home/melo/Servers/Melo.se/meloAuth/meloAuth.js
 app.get("/", (req, res) => { // Get available weeks
     res.sendFile(__dirname + "/client/index.html")
 })
+app.get("/CNGMatSetup.exe", (req, res) => { // Get available weeks
+    res.sendFile(__dirname + "/client/download/CNGMatSetup.exe")
+})
 
 
 /* 
