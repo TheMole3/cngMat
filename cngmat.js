@@ -25,7 +25,7 @@ module.exports = function(app, db, config) {
                 let doc = new jsdom.JSDOM(body); // Convert requested body to JSDOM object
                 let document = doc.window.document;
 
-                let regex = new RegExp( /skol|mat|sedel|bildningen/gi);
+                let regex = new RegExp( /skol|mat|sedel|bildningen|meny/gi);
                 let images = Array.from(document.querySelectorAll('[class^="sv-image-portlet"] > img')); // Get images from webpage
                 images = images.filter(e => regex.test(e.alt)); // Remove non matsedel images
                 images.forEach(async image => {
