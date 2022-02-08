@@ -8,8 +8,6 @@ module.exports = function(app, db, config) {
 
     Date.prototype.getWeekNumber = function(){var d = new Date(Date.UTC(this.getFullYear(), this.getMonth(), this.getDate()));var dayNum = d.getUTCDay() || 7;d.setUTCDate(d.getUTCDate() + 4 - dayNum);var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil((((d - yearStart) / 86400000) + 1)/7)};
 
-    let sourceUrl = "https://finspang.se/bergska/bergskagymnasiet/ovriga/matsedel/matsedelibildningen.4.166aa05167c62dff5dc3168.html"
-
     let cngMat = {
         loadFoodFromSource: (cb) => {
             const weekReference = {
@@ -20,7 +18,9 @@ module.exports = function(app, db, config) {
                 "torsdag": "thu",
                 "fredag": "fri"
             }
-            request(sourceUrl, async (error, resp, body) => { // Get the body of the url
+
+            request(config.menuURL, async (error, resp, body) => // Get the body of the url
+            { 
                 body = decodeURIComponent( encodeURIComponent( body ));
                 let doc = new jsdom.JSDOM(body); // Convert requested body to JSDOM object
                 let document = doc.window.document;
@@ -28,14 +28,19 @@ module.exports = function(app, db, config) {
                 let regex = new RegExp( /skol|mat|sedel|bildningen|meny/gi);
                 let images = Array.from(document.querySelectorAll('[class^="sv-image-portlet"] > img')); // Get images from webpage
                 images = images.filter(e => regex.test(e.alt)); // Remove non matsedel images
-                images.forEach(async image => {
+                
+                images.forEach(async image => 
+                    {
                     const input = (await axios({ url: "https://finspang.se" + image.src, responseType: "arraybuffer" })).data; // Get image from webpage as a buffer
+                    
                     sharp(input) // Load picture of food
                         .extract({ width: 500, height: 150, left: 1150, top: 500  }) // Resize picture to only show week number
                         .toBuffer({ resolveWithObject: true })
-                        .then(async ({ data, info }) => {
+                        .then(async ({ data, info }) => 
+                        {
                             let req = await ocrSpace("data:image/png;base64," + Buffer.from(data).toString('base64'), { apiKey: config.OCRSpaceKey, language: 'swe' });
                             if(req.IsErroredOnProcessing) return console.error(req.ErrorMessage)
+                            
                             let text = req.ParsedResults[0].ParsedText
                             let weekObject = { // Create an object for this weeks food
                                 year: new Date().getFullYear().toString(),
@@ -43,35 +48,42 @@ module.exports = function(app, db, config) {
                             };
                 
                             sharp(input) // Load picture of food
-                            .extract({width: 1450, height: 1310, left: 130, top: 600  }) // Resize picture to only show the food
-                            .toBuffer({ resolveWithObject: true })
-                            .then(async ({ data, info }) => {
-                                let req = await ocrSpace("data:image/png;base64," + Buffer.from(data).toString('base64'), { apiKey: config.OCRSpaceKey, language: 'swe' });
-                                if(req.IsErroredOnProcessing) return console.error(req.ErrorMessage)
-                                let str = (" "+req.ParsedResults[0].ParsedText).replace(/(.|\s)+?(?=Måndag)|/m, "").replace(/\./g, ""); // Remove Weird characters that are not relevant
-                                let days = str.split(/(Måndag|Tisdag|Onsdag|Torsdag|Fredag).*\s/ig).filter(n => n); // Split into each weekday and filter empty
+                                .extract({width: 1450, height: 1310, left: 130, top: 600  }) // Resize picture to only show the food
+                                .toBuffer({ resolveWithObject: true })
+                                .then(async ({ data, info }) => 
+                                {
+                                    let req = await ocrSpace("data:image/png;base64," + Buffer.from(data).toString('base64'), { apiKey: config.OCRSpaceKey, language: 'swe' });
+                                    if(req.IsErroredOnProcessing) return console.error(req.ErrorMessage)
+                                    
+                                    let str = (" "+req.ParsedResults[0].ParsedText).replace(/(.|\s)+?(?=Måndag)|/m, "").replace(/\./g, ""); // Remove Weird characters that are not relevant
+                                    let days = str.split(/(Måndag|Tisdag|Onsdag|Torsdag|Fredag).*\s/ig).filter(n => n); // Split into each weekday and filter empty
 
-                                for (let i = 0; i < days.length; i+=2) {
-                                    let food = days[i+1].split(/(Veg[^\w]+)/gi).map(el => el.trim()); // Split the vegitarian option
-                                    food[0] = food[0].replace(/\n*$/g, "").split("\n").map(el => el.trim()); // Split into diffrent foods for the day
-                                    let match = new RegExp(/(^\s*.\s*$)|(^("|o|0|\.|\s|e)*$)/gi) // Regex that matches any string that only has one character or with only 0 o e \s or . in it
-                                    food[0] = food[0].filter((e) => !match.test(JSON.stringify(e))).filter((e) => !match.test(JSON.stringify(e))); // Remove all entries matching regex ^ idk why we need two filter but we apparently do?
+                                    for (let i = 0; i < days.length; i+=2) 
+                                    {
+                                        let food = days[i+1].split(/(Veg[^\w]+)/gi).map(el => el.trim()); // Split the vegitarian option
+                                        food[0] = food[0].replace(/\n*$/g, "").split("\n").map(el => el.trim()); // Split into diffrent foods for the day
+                                        
+                                        let match = new RegExp(/(^\s*.\s*$)|(^("|o|0|\.|\s|e)*$)/gi) // Regex that matches any string that only has one character or with only 0 o e \s or . in it
+                                        food[0] = food[0].filter((e) => !match.test(JSON.stringify(e))).filter((e) => !match.test(JSON.stringify(e))); // Remove all entries matching regex ^ idk why we need two filter but we apparently do?
 
-                                    weekObject[weekReference[days[i].toLowerCase()]] = {
-                                        food: food[0],
-                                        veg: food[2]?food[2]:""
-                                    };
-                                }
-                                db.cngMat.update({$and: [{week: weekObject.week}, {year: weekObject.year}]}, {$setOnInsert: weekObject}, {upsert: true}); // Add available data to database, don't update if data already exists
-                                if(cb) cb(200)
+                                        weekObject[weekReference[days[i].toLowerCase()]] = {
+                                            food: food[0],
+                                            veg: food[2]?food[2]:""
+                                        };
+                                    }
+                                    
+                                    db.cngMat.update({$and: [{week: weekObject.week}, {year: weekObject.year}]}, {$setOnInsert: weekObject}, {upsert: true}); // Add available data to database, don't update if data already exists
+                                    
+                                    if(cb) cb(200)
+                                });
                             });
-                        });
                 });
             });
         },
         getFromDate: function(d, cb) { // Get food, in a callback, from DB by supplying a Date object
             let date = new Date(d);
             let corresponding = [null, "mon", "tue", "wed", "thu", "fri", null]
+
             db.cngMat.find({$and: [{week: date.getWeekNumber().toString()}, {year: date.getFullYear().toString()}]}, (error, docs) => {
               if(!corresponding[date.getDay()] || !docs[0]) return cb(404)
               let food = docs[0][corresponding[date.getDay()]]
@@ -82,10 +94,12 @@ module.exports = function(app, db, config) {
         getAdjusted: (cb) => {
             let today = true;
             let currDate = new Date();
+
             if(currDate.getHours() >= 13) {
                 currDate.setTime(currDate.getTime() + (24 * 60 * 60 * 1000))
                 today = false;
             }
+
             cngMat.getFromDate(currDate, (food) => {
 				food.today = today
                 cb(food)
@@ -95,14 +109,16 @@ module.exports = function(app, db, config) {
         getAvailableWeeks: (cb) => { // Get all avaiable weeks in database
             db.cngMat.distinct("year", {}, async (error, docs) => {
                 let values = {}
+
                 const promises = docs.map((el) => {
-                    return new Promise((resolve => {
+                    return new Promise(resolve => {
                         db.cngMat.distinct("week", {year: el}, (error, docs) => {
                             values[el] = docs;
                             resolve()
                         })
-                    }))
+                    })
                 });
+
                 // wait until all promises are resolved
                 await Promise.all(promises);
                 cb(values)

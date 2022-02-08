@@ -2,5 +2,7 @@
     "port": port,
     "dbConnect": "DB Connect string",
     "auth": false,
-    "OCRSpaceKey": "OCR Space Key"
+    "OCRSpaceKey": "OCR Space Key",
+
+    "menuURL": "url to page containing food menu"
   }
